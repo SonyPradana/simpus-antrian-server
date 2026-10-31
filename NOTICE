@@ -1,0 +1,11 @@
+Antrian API
+Copyright 2026 Sony Pradana
+
+This product is the simpus-antrian-server project:
+https://github.com/SonyPradana/simpus-antrian-server
+
+Third-party Go modules are used under their own licenses; see go.mod and
+go.sum.
+
+The BPJS/PCare integration implements the public BPJS Kesehatan API
+documentation.

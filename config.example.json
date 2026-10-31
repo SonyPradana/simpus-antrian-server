@@ -1,0 +1,10 @@
+{
+  "registrasi": {
+    "petugas_id": "1",
+    "jenis_pasien_id": "1",
+    "jenis_puskesmas_id": "1",
+    "jenis_tindakan_id": "1",
+    "jenis_pengirim_id": "1",
+    "jenis_kunjungan_id": "1"
+  }
+}

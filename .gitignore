@@ -1,0 +1,12 @@
+# Local secrets and machine-specific config
+.env
+.env.*
+!.env.example
+config.json
+
+# Build and test artifacts
+*.exe
+*.log
+*.out
+coverage.*
+data/
