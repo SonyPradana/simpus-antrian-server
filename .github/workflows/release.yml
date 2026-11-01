@@ -1,0 +1,43 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - run: go vet ./...
+      - run: go test -count=1 ./...
+      - name: Build
+        env:
+          GOOS: windows
+          GOARCH: amd64
+          CGO_ENABLED: '0'
+        run: |
+          go build -trimpath \
+            -ldflags "-s -w -X main.version=${GITHUB_REF_NAME}" \
+            -o dist/antrian.exe ./cmd/antrian
+      - name: Package
+        run: |
+          cp README.md LICENSE NOTICE .env.example config.example.json dist/
+          cd dist
+          zip -r "../antrian-${GITHUB_REF_NAME}-windows-amd64.zip" .
+      - name: Checksum
+        run: sha256sum antrian-*.zip > checksums.txt
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" antrian-*.zip checksums.txt \
+            --title "$GITHUB_REF_NAME" --generate-notes --verify-tag
