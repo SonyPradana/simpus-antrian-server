@@ -189,7 +189,19 @@ Run the health check:
 curl -sS http://localhost:8080/healthz
 ```
 
+## Releases
+
+Pushing a `v*` tag (for example `v0.1.0`) runs `.github/workflows/release.yml`. The workflow tests the code, builds `antrian.exe` for Windows amd64, packages it with `README.md`, `LICENSE`, `NOTICE`, `.env.example`, and `config.example.json`, then publishes `antrian-<tag>-windows-amd64.zip` plus `checksums.txt` on GitHub Releases. No repository secret is required. Local builds report `dev`; release builds carry the tag (see `antrian version` below).
+
 ## CLI
+
+### Show version
+
+```bash
+./antrian version
+```
+
+Prints the build version. Release binaries print the tag (for example `v0.1.0`); local builds print `dev`.
 
 ### List polyclinics
 

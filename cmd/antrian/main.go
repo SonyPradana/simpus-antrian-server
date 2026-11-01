@@ -21,6 +21,9 @@ import (
 	"github.com/SonyPradana/simpus-antrian-server/internal/service"
 )
 
+// version is set at build time with -ldflags "-X main.version=<tag>".
+var version = "dev"
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -49,6 +52,9 @@ func run() error {
 		return queueOnly(os.Args[2:], "empty")
 	case "new":
 		return queueOnly(os.Args[2:], "new")
+	case "version", "-v", "--version":
+		fmt.Println(version)
+		return nil
 	case "help", "-h", "--help":
 		usage()
 		return nil
@@ -59,7 +65,7 @@ func run() error {
 }
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: antrian <serve|poli|dokter|lookup|register|options|empty|new> [flags]")
+	fmt.Fprintln(os.Stderr, "usage: antrian <serve|poli|dokter|lookup|register|options|empty|new|version> [flags]")
 }
 
 func newApp(ctx context.Context) (*service.Service, func(), error) {
