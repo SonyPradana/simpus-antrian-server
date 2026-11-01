@@ -21,7 +21,7 @@ Implemented:
 - Calls to `SPapmsimpus` and `SPinsertFingerUnit`.
 - Blank/new-patient queue numbers without patient or visit records.
 - JSON registration settings at `<exe-dir>/config.json`.
-- Registration option lookup endpoint and CLI command.
+- Registration options for the APM facade and the CLI.
 - BPJS/PCare participant verification.
 - REST API and CLI.
 - APM facade for other applications under `/api/v1/apm/*`, protected by `x-api-key`.
@@ -300,7 +300,7 @@ Every request must include:
 X-API-Key: <APM_API_KEY>
 ```
 
-If the key is missing or wrong, the response is `401 UNAUTHORIZED`. If `APM_API_KEY` is not configured, the facade returns `503 APM_NOT_CONFIGURED`; the legacy endpoints remain available.
+If the key is missing or wrong, the response is `401 UNAUTHORIZED`. If `APM_API_KEY` is not configured, every `/api/v1/apm/*` request returns `503 APM_NOT_CONFIGURED`.
 
 #### `GET /api/v1/apm/options`
 
@@ -397,24 +397,7 @@ Fields:
 
 Request overrides take precedence over server config. The location is always derived from `poscheck_id`; the API does not accept free-text location.
 
-Response status is `201` for a real queue and `200` for a dry-run. Other statuses and error codes match the registration/queue endpoints. The response includes `petugas_id`, `poscheck_id`, and `lokasi` when available.
-
-### Deprecated legacy endpoints
-
-The endpoints below are deprecated and remain temporarily for backward compatibility. Responses include `Deprecation: true`; when a replacement exists, the response also includes a `Link` header with `rel="successor-version"`. New integrations must use the APM facade.
-
-| Deprecated endpoint | Replacement |
-|---|---|
-| `GET /api/v1/poli` | `GET /api/v1/apm/poli` |
-| `GET /api/v1/dokter` | `GET /api/v1/apm/dokter` |
-| `GET /api/v1/patients/lookup` | `POST /api/v1/apm/lookup` |
-| `POST /api/v1/registration` | `POST /api/v1/apm/queue` with `"mode": "registration"` |
-| `POST /api/v1/regestration` | `POST /api/v1/apm/queue` with `"mode": "registration"` |
-| `POST /api/v1/queue/empty` | `POST /api/v1/apm/queue` with `"mode": "blank"` |
-| `POST /api/v1/queue/new` | `POST /api/v1/apm/queue` with `"mode": "blank"` |
-| `GET /api/v1/registration/options` | `GET /api/v1/apm/options` for petugas/poscheck; other settings via `config.json` or `./antrian options` |
-
-Do not add new features to these endpoints. Remove them when the old callers have migrated. See [`docs/deprecated-api.md`](docs/deprecated-api.md) for the removal checklist.
+Response status is `201` for a real queue and `200` for a dry-run. HTTP status and error codes are listed below. The response includes `petugas_id`, `poscheck_id`, and `lokasi` when available.
 
 ### `GET /healthz`
 
@@ -428,191 +411,7 @@ Response:
 { "status": "ok" }
 ```
 
-### `GET /api/v1/poli` (deprecated)
-
-Use `GET /api/v1/apm/poli` instead.
-
-Returns active polyclinics.
-
-```bash
-curl -sS http://localhost:8080/api/v1/poli
-```
-
-### `GET /api/v1/dokter?poli_id=89` (deprecated)
-
-Use `GET /api/v1/apm/dokter?poli_id=89` instead.
-
-Returns doctors for the polyclinic and today's date.
-
-```bash
-curl -sS 'http://localhost:8080/api/v1/dokter?poli_id=89'
-```
-
-The query alias `poli` is also accepted.
-
-### `GET /api/v1/registration/options` (deprecated)
-
-Use `GET /api/v1/apm/options` for active petugas and poscheck/location choices. Other registration settings remain in `config.json` or `./antrian options`.
-
-Returns the six registration settings from the database and the values selected in `config.json`.
-
-```bash
-curl -sS http://localhost:8080/api/v1/registration/options
-```
-
-### `POST /api/v1/queue/empty` and `POST /api/v1/queue/new` (deprecated)
-
-Use `POST /api/v1/apm/queue` with `"mode": "blank"` instead.
-
-Queue-only endpoints. They do not accept patient identifiers and do not create patient or visit rows.
-
-Request body:
-
-```json
-{
-  "poli_id": "01",
-  "kode_dokter": "00001",
-  "dry_run": true
-}
-```
-
-```bash
-curl -sS -X POST http://localhost:8080/api/v1/queue/empty \
-  -H 'Content-Type: application/json' \
-  -d '{"poli_id":"01","kode_dokter":"00001","dry_run":true}'
-
-curl -sS -X POST http://localhost:8080/api/v1/queue/new \
-  -H 'Content-Type: application/json' \
-  -d '{"poli_id":"01","kode_dokter":"00001","dry_run":true}'
-```
-
-Response:
-
-```json
-{
-  "data": {
-    "jenis": "empty",
-    "poli": {
-      "id": "01",
-      "nama": "Poli Contoh",
-      "prefix": "A"
-    },
-    "dokter": {
-      "kode_dokter": "00001",
-      "nama_dokter": "dr. Contoh",
-      "jam_praktek": "07:30-12:00",
-      "kapasitas": 18
-    },
-    "antrian": {
-      "kode": "A001",
-      "no_urut_poli": 1,
-      "no_urut": 80,
-      "tanggal": "2026-10-22",
-      "poli": "Poli Contoh",
-      "dokter": "dr. Contoh",
-      "kode_dokter": "00001",
-      "menunggu_di_depan": 0,
-      "sisa_kuota": 17
-    },
-    "dry_run": true
-  }
-}
-```
-
-`dry_run` can also be set with `?dry_run=true`. HTTP status codes are the same as registration, plus `503 QUEUE_BUSY` when the queue lock cannot be acquired within five seconds.
-
-### `GET /api/v1/patients/lookup` (deprecated)
-
-Use `POST /api/v1/apm/lookup` instead.
-
-Query parameters:
-
-- `nik`
-- `no_bpjs` or `bpjs`
-- `no_rm`
-- `pcare` (optional, default `true`)
-
-Send exactly one identifier. `no_bpjs` and `bpjs` are aliases, so do not send both.
-
-```bash
-curl -sS 'http://localhost:8080/api/v1/patients/lookup?no_rm=000001'
-curl -sS 'http://localhost:8080/api/v1/patients/lookup?no_rm=000001&pcare=false'
-```
-
-### `POST /api/v1/registration` (deprecated)
-
-Use `POST /api/v1/apm/queue` with `"mode": "registration"` instead.
-
-Legacy alias: `POST /api/v1/regestration` (also deprecated).
-
-Request body:
-
-```json
-{
-  "nik": "0000000000000001",
-  "no_bpjs": "0000000000001",
-  "no_rm": "000001",
-  "poli_id": "01",
-  "kode_dokter": "00001",
-  "dry_run": true
-}
-```
-
-Fields:
-
-| Field | Required | Description |
-|---|---|---|
-| `nik` | exactly one identifier | Patient NIK |
-| `no_bpjs` / `bpjs` | exactly one identifier | BPJS card number; the two names are aliases |
-| `no_rm` | exactly one identifier | Medical record number |
-| `poli_id` | yes | Polyclinic ID, for example `01` or `89` |
-| `kode_dokter` | no | Doctor code; required when more than one doctor is available |
-| `petugas_id` | no | Active registration worker override; defaults to `WORKER_ID` |
-| `poscheck_id` | no | Location override; defaults to `POSCHECK_ID`. The `lokasi` is always resolved from this ID |
-| `dry_run` | no | Preview only; no database writes |
-| `pcare` | no | Verify BPJS through PCare; defaults to `true` |
-
-The legacy endpoints do not accept a free-text `lokasi` field. Send `poscheck_id`; the server reads `poschecks.nama` and writes that name to `finger_unit.Lokasi`.
-
-Send exactly one identifier. Sending more than one or both BPJS aliases returns `INVALID_INPUT`.
-
-Dry-run example:
-
-```bash
-curl -sS -X POST http://localhost:8080/api/v1/registration \
-  -H 'Content-Type: application/json' \
-  -d '{"no_rm":"000001","poli_id":"01","dry_run":true}'
-```
-
-Dry-run without PCare:
-
-```bash
-curl -sS -X POST http://localhost:8080/api/v1/registration \
-  -H 'Content-Type: application/json' \
-  -d '{"no_rm":"000001","poli_id":"01","dry_run":true,"pcare":false}'
-```
-
-Registration example:
-
-```bash
-curl -sS -X POST http://localhost:8080/api/v1/registration \
-  -H 'Content-Type: application/json' \
-  -d '{"no_rm":"000001","poli_id":"01","kode_dokter":"00001"}'
-```
-
-Response fields:
-
-- `patient`
-- `bpjs`
-- `poli`
-- `dokter`
-- `antrian`
-- `petugas_id`, `poscheck_id`, and `lokasi` when resolved
-- `visit_id` except in dry-run
-- `dry_run`
-- `sudah_terdaftar` when a queue already exists
-
-HTTP status codes:
+### HTTP status and error codes
 
 - `201` registration created
 - `200` dry-run succeeded
@@ -666,7 +465,7 @@ config.json            registration settings next to the executable
 - A real registration changes visit and queue data. Only run it in a test environment or after explicit approval.
 - Real `empty`/`new` calls write four `finger_unit` rows and one `finger_laporan` row even though no patient or visit is created.
 - Compensation logic is best effort and does not replace a backup.
-- Patient data is sensitive. Do not expose this API on an open network without authentication. The `/api/v1/apm/*` facade requires `x-api-key`, but the legacy endpoints remain unauthenticated for backward compatibility.
+- Patient data is sensitive. Do not expose this API on an open network without authentication. Every `/api/v1/apm/*` request requires the `x-api-key` header.
 
 ## License
 

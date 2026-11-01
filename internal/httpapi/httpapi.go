@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/SonyPradana/simpus-antrian-server/internal/model"
 	"github.com/SonyPradana/simpus-antrian-server/internal/service"
 )
 
@@ -29,14 +28,6 @@ func New(svc *service.Service, logger *slog.Logger, apiKey, corsOrigin string) *
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.health)
-	mux.HandleFunc("GET /api/v1/poli", s.deprecated("/api/v1/apm/poli", s.listPoli))
-	mux.HandleFunc("GET /api/v1/dokter", s.deprecated("/api/v1/apm/dokter", s.listDoctors))
-	mux.HandleFunc("GET /api/v1/registration/options", s.deprecated("", s.registrationOptions))
-	mux.HandleFunc("GET /api/v1/patients/lookup", s.deprecated("/api/v1/apm/lookup", s.lookupPatient))
-	mux.HandleFunc("POST /api/v1/registration", s.deprecated("/api/v1/apm/queue", s.register))
-	mux.HandleFunc("POST /api/v1/regestration", s.deprecated("/api/v1/apm/queue", s.register))
-	mux.HandleFunc("POST /api/v1/queue/empty", s.deprecated("/api/v1/apm/queue", s.emptyQueue))
-	mux.HandleFunc("POST /api/v1/queue/new", s.deprecated("/api/v1/apm/queue", s.newQueue))
 	mux.Handle("POST /api/v1/apm/lookup", s.withAPIKey(http.HandlerFunc(s.apmLookup)))
 	mux.Handle("GET /api/v1/apm/options", s.withAPIKey(http.HandlerFunc(s.apmOptions)))
 	mux.Handle("GET /api/v1/apm/poli", s.withAPIKey(http.HandlerFunc(s.apmListPoli)))
@@ -47,139 +38,6 @@ func (s *Server) Handler() http.Handler {
 
 func (s *Server) health(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"status": "ok"})
-}
-
-func (s *Server) listPoli(w http.ResponseWriter, r *http.Request) {
-	items, err := s.service.ListPoli(r.Context())
-	if err != nil {
-		s.writeServiceError(w, err, nil)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": items})
-}
-
-func (s *Server) listDoctors(w http.ResponseWriter, r *http.Request) {
-	poliID := strings.TrimSpace(r.URL.Query().Get("poli_id"))
-	if poliID == "" {
-		poliID = strings.TrimSpace(r.URL.Query().Get("poli"))
-	}
-	result, err := s.service.ListDoctors(r.Context(), poliID)
-	if err != nil {
-		s.writeServiceError(w, err, nil)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": result})
-}
-
-func (s *Server) registrationOptions(w http.ResponseWriter, r *http.Request) {
-	options, err := s.service.RegistrationOptions(r.Context())
-	if err != nil {
-		s.writeServiceError(w, err, nil)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": options})
-}
-
-func (s *Server) emptyQueue(w http.ResponseWriter, r *http.Request) {
-	s.queueOnly(w, r, "empty")
-}
-
-func (s *Server) newQueue(w http.ResponseWriter, r *http.Request) {
-	s.queueOnly(w, r, "new")
-}
-
-func (s *Server) queueOnly(w http.ResponseWriter, r *http.Request, kind string) {
-	var req service.QueueOnlyRequest
-	if err := decodeJSON(w, r, &req); err != nil {
-		s.writeServiceError(w, err, nil)
-		return
-	}
-	if value := r.URL.Query().Get("dry_run"); value != "" {
-		parsed, err := strconv.ParseBool(value)
-		if err != nil {
-			s.writeServiceError(w, service.ErrInvalidInput, nil)
-			return
-		}
-		req.DryRun = parsed
-	}
-
-	var (
-		result model.QueueOnlyResult
-		err    error
-	)
-	switch kind {
-	case "new":
-		result, err = s.service.CreateNewQueue(r.Context(), req)
-	default:
-		result, err = s.service.CreateEmptyQueue(r.Context(), req)
-	}
-	if err != nil {
-		s.writeServiceError(w, err, nil)
-		return
-	}
-	status := http.StatusCreated
-	if result.DryRun {
-		status = http.StatusOK
-	}
-	writeJSON(w, status, map[string]any{"data": result})
-}
-
-func (s *Server) lookupPatient(w http.ResponseWriter, r *http.Request) {
-	pcare, err := queryOptionalBool(r, "pcare")
-	if err != nil {
-		s.writeServiceError(w, err, nil)
-		return
-	}
-	req := service.LookupRequest{
-		NIK:    r.URL.Query().Get("nik"),
-		NoBPJS: r.URL.Query().Get("no_bpjs"),
-		BPJS:   r.URL.Query().Get("bpjs"),
-		NoRM:   r.URL.Query().Get("no_rm"),
-		PCare:  pcare,
-	}
-	result, err := s.service.LookupPatient(r.Context(), req)
-	if err != nil {
-		s.writeServiceError(w, err, nil)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"data": result})
-}
-
-func (s *Server) register(w http.ResponseWriter, r *http.Request) {
-	var req service.RegisterRequest
-	if err := decodeJSON(w, r, &req); err != nil {
-		s.writeServiceError(w, err, nil)
-		return
-	}
-	if value := r.URL.Query().Get("dry_run"); value != "" {
-		parsed, err := strconv.ParseBool(value)
-		if err != nil {
-			s.writeServiceError(w, service.ErrInvalidInput, nil)
-			return
-		}
-		req.DryRun = parsed
-	}
-	if pcare, err := queryOptionalBool(r, "pcare"); err != nil {
-		s.writeServiceError(w, err, nil)
-		return
-	} else if pcare != nil {
-		req.PCare = pcare
-	}
-	result, err := s.service.Register(r.Context(), req)
-	if err != nil {
-		var already *service.AlreadyRegisteredError
-		if errors.As(err, &already) {
-			s.writeServiceError(w, err, &already.Result)
-			return
-		}
-		s.writeServiceError(w, err, nil)
-		return
-	}
-	status := http.StatusCreated
-	if result.DryRun {
-		status = http.StatusOK
-	}
-	writeJSON(w, status, map[string]any{"data": result})
 }
 
 func (s *Server) writeServiceError(w http.ResponseWriter, err error, data any) {
@@ -276,16 +134,6 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	encoder := json.NewEncoder(w)
 	encoder.SetEscapeHTML(false)
 	_ = encoder.Encode(payload)
-}
-
-func (s *Server) deprecated(successor string, next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Deprecation", "true")
-		if successor != "" {
-			w.Header().Set("Link", "<"+successor+">; rel=\"successor-version\"")
-		}
-		next(w, r)
-	}
 }
 
 func (s *Server) withCORS(next http.Handler) http.Handler {

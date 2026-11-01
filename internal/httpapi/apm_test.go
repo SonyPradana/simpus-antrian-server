@@ -1,49 +1,41 @@
 package httpapi
 
 import (
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
-func TestDeprecatedHeaders(t *testing.T) {
-	next := func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	}
+func TestLegacyEndpointsRemoved(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	handler := New(nil, logger, "secret", "").Handler()
 
-	tests := []struct {
-		name       string
-		successor  string
-		wantLink   string
-		wantNoLink bool
+	requests := []struct {
+		method string
+		path   string
 	}{
-		{name: "with successor", successor: "/api/v1/apm/poli", wantLink: `</api/v1/apm/poli>; rel="successor-version"`},
-		{name: "without successor", wantNoLink: true},
+		{http.MethodGet, "/api/v1/poli"},
+		{http.MethodGet, "/api/v1/dokter"},
+		{http.MethodGet, "/api/v1/registration/options"},
+		{http.MethodGet, "/api/v1/patients/lookup"},
+		{http.MethodPost, "/api/v1/registration"},
+		{http.MethodPost, "/api/v1/regestration"},
+		{http.MethodPost, "/api/v1/queue/empty"},
+		{http.MethodPost, "/api/v1/queue/new"},
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			server := &Server{}
-			req := httptest.NewRequest(http.MethodGet, "/api/v1/poli", nil)
+	for _, request := range requests {
+		t.Run(request.method+" "+request.path, func(t *testing.T) {
+			req := httptest.NewRequest(request.method, request.path, nil)
 			rec := httptest.NewRecorder()
 
-			server.deprecated(tt.successor, next).ServeHTTP(rec, req)
+			handler.ServeHTTP(rec, req)
 
-			if rec.Code != http.StatusNoContent {
-				t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
-			}
-			if got := rec.Header().Get("Deprecation"); got != "true" {
-				t.Fatalf("Deprecation = %q, want true", got)
-			}
-			if tt.wantNoLink {
-				if got := rec.Header().Get("Link"); got != "" {
-					t.Fatalf("Link = %q, want empty", got)
-				}
-				return
-			}
-			if got := rec.Header().Get("Link"); got != tt.wantLink {
-				t.Fatalf("Link = %q, want %q", got, tt.wantLink)
+			if rec.Code != http.StatusNotFound {
+				t.Fatalf("status = %d, want %d", rec.Code, http.StatusNotFound)
 			}
 		})
 	}
