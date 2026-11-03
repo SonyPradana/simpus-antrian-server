@@ -485,3 +485,5 @@ Copyright 2026 Sony Pradana.
 
 Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text and [NOTICE](NOTICE) for attribution.
 
+Security reports go through the private advisory flow described in [SECURITY.md](SECURITY.md).
+
