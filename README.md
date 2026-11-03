@@ -70,7 +70,7 @@ The advisory lock `GET_LOCK('apm:queue:<date>')` is acquired on a dedicated data
 
 - Go 1.27 or newer.
 - Access to the SIMPUS MariaDB/MySQL database.
-- A local `.env` in the working directory (recommended) or equivalent environment variables. The legacy `koneksi.jjk` file is optional and only read when `KONEKSI_FILE` is set.
+- A local `.env` in the working directory (recommended) or equivalent environment variables.
 - PCare credentials are optional. Without them, BPJS verification can be disabled globally or skipped per request.
 
 ## Configuration
@@ -79,8 +79,7 @@ Settings are resolved in this order:
 
 1. environment variables
 2. `config.json`
-3. legacy `koneksi.jjk` (only when `KONEKSI_FILE` is set)
-4. built-in defaults for generic settings
+3. built-in defaults for generic settings
 
 Registration IDs are site-specific and have no built-in defaults. `WORKER_ID`, `POSCHECK_ID`, `ACTION_ID`, `CONSIGNOR_ID`, and `GROUPVISIT_ID` must come from the environment or `config.json`; otherwise the server refuses to start.
 
@@ -112,7 +111,7 @@ Example `config.json`:
 
 `jenis_kunjungan_id` is the global `sKunjSakit` value used by normal registration. The per-polyclinic `poliSakit` column is no longer used for `visits.kunj_sakit`.
 
-The legacy `koneksi.jjk` file is only read when `KONEKSI_FILE` points to it. The server also loads `.env` from the working directory when present; that file is the preferred local source and must never be committed. See `.env.example` and `config.example.json` for the full list.
+The server also loads `.env` from the working directory when present; that file is the preferred local source and must never be committed. See `.env.example` and `config.example.json` for the full list.
 
 Supported environment variables:
 
@@ -121,13 +120,12 @@ Supported environment variables:
 | `APP_ADDR` | `:8080` | HTTP listen address |
 | `APP_TIMEZONE` | `Asia/Jakarta` | Application timezone |
 | `APP_USER_AGENT` | `simpus-antrian` | User-Agent sent to PCare |
-| `KONEKSI_FILE` | empty | Path to the optional legacy connection file |
 | `CONFIG_FILE` | `<exe-dir>/config.json` | Path to the JSON registration settings |
 | `DB_DSN` | empty | MySQL DSN; overrides individual DB settings |
-| `DB_HOST` | from `KONEKSI_FILE` | Database host |
+| `DB_HOST` | empty | Database host |
 | `DB_PORT` | `3306` | Database port |
-| `DB_USER` | from `KONEKSI_FILE` | Database user |
-| `DB_PASSWORD` | from `KONEKSI_FILE` | Database password |
+| `DB_USER` | empty | Database user |
+| `DB_PASSWORD` | empty | Database password |
 | `DB_NAME` | `simpus` | Database name |
 | `PCARE_BASE_URL` | `https://new-apijkn.bpjs-kesehatan.go.id/pcare-rest` | PCare base URL |
 | `PCARE_MODE` | `warn` | `off`, `warn`, or `strict` |
@@ -461,7 +459,7 @@ If a polyclinic is already full, dry-run returns `QUOTA_EXCEEDED` before any wri
 
 ```text
 cmd/antrian/          CLI and HTTP entrypoint
-internal/config/      configuration, config.json, and koneksi.jjk parsing
+internal/config/      environment, .env, and config.json loading
 internal/db/          database connection
 internal/model/       response models
 internal/repository/  patient, polyclinic, doctor, registration options, queue, and stored procedure queries

@@ -17,7 +17,6 @@ type Config struct {
 	Addr              string
 	Timezone          string
 	DBDSN             string
-	KoneksiFile       string
 	ConfigFile        string
 	PcareBaseURL      string
 	PcareMode         string
@@ -61,12 +60,6 @@ func Load() (Config, error) {
 		return Config{}, fmt.Errorf("load timezone %s: %w", locName, err)
 	}
 
-	koneksiFile := strings.TrimSpace(os.Getenv("KONEKSI_FILE"))
-	ini := map[string]map[string]string{}
-	if koneksiFile != "" {
-		ini, _ = readINI(koneksiFile)
-	}
-
 	configFile, configFileRequired := resolveConfigFile()
 	fileCfg, err := readConfigFile(configFile, configFileRequired)
 	if err != nil {
@@ -77,7 +70,6 @@ func Load() (Config, error) {
 	cfg := Config{
 		Addr:              getenv("APP_ADDR", ":8080"),
 		Timezone:          locName,
-		KoneksiFile:       koneksiFile,
 		ConfigFile:        configFile,
 		PcareBaseURL:      getenv("PCARE_BASE_URL", "https://new-apijkn.bpjs-kesehatan.go.id/pcare-rest"),
 		PcareMode:         strings.ToLower(getenv("PCARE_MODE", "warn")),
@@ -86,14 +78,14 @@ func Load() (Config, error) {
 		UserAgent:         getenv("APP_USER_AGENT", "simpus-antrian"),
 		APMAPIKey:         strings.TrimSpace(os.Getenv("APM_API_KEY")),
 		CORSOrigin:        strings.TrimSpace(os.Getenv("CORS_ALLOWED_ORIGIN")),
-		Location:          getenv("LOCATION", iniGet(ini, "regristasi", "poschecks", "")),
+		Location:          getenv("LOCATION", ""),
 		LocationExplicit:  locationEnv != "",
-		WorkerID:          getenv("WORKER_ID", firstNonEmpty(fileCfg.Registrasi.PetugasID, iniGet(ini, "regristasi", "petugasid", ""))),
-		PoscheckID:        getenv("POSCHECK_ID", firstNonEmpty(fileCfg.Registrasi.JenisPuskesmasID, iniGet(ini, "regristasi", "poschecksid", ""))),
-		ActionID:          getenv("ACTION_ID", firstNonEmpty(fileCfg.Registrasi.JenisTindakanID, iniGet(ini, "regristasi", "actionsid", ""))),
-		ConsignorID:       getenv("CONSIGNOR_ID", firstNonEmpty(fileCfg.Registrasi.JenisPengirimID, iniGet(ini, "regristasi", "consignorsid", ""))),
-		GroupvisitID:      getenv("GROUPVISIT_ID", firstNonEmpty(fileCfg.Registrasi.JenisPasienID, iniGet(ini, "regristasi", "groupvisitsid", ""))),
-		JenisKunjungan:    getenv("JENIS_KUNJUNGAN_ID", firstNonEmpty(fileCfg.Registrasi.JenisKunjunganID, iniGet(ini, "regristasi", "kunjungan", "1"))),
+		WorkerID:          getenv("WORKER_ID", fileCfg.Registrasi.PetugasID),
+		PoscheckID:        getenv("POSCHECK_ID", fileCfg.Registrasi.JenisPuskesmasID),
+		ActionID:          getenv("ACTION_ID", fileCfg.Registrasi.JenisTindakanID),
+		ConsignorID:       getenv("CONSIGNOR_ID", fileCfg.Registrasi.JenisPengirimID),
+		GroupvisitID:      getenv("GROUPVISIT_ID", fileCfg.Registrasi.JenisPasienID),
+		JenisKunjungan:    getenv("JENIS_KUNJUNGAN_ID", firstNonEmpty(fileCfg.Registrasi.JenisKunjunganID, "1")),
 		AllowOverQuota:    getbool("ALLOW_OVERQUOTA", false),
 		HTTPTimeout:       getduration("HTTP_TIMEOUT", 15*time.Second),
 		ShutdownTimeout:   getduration("SHUTDOWN_TIMEOUT", 10*time.Second),
@@ -116,11 +108,11 @@ func Load() (Config, error) {
 		return cfg, nil
 	}
 
-	host := getenv("DB_HOST", iniGet(ini, "db", "host", ""))
-	port := getenv("DB_PORT", iniGet(ini, "db", "port", "3306"))
-	user := getenv("DB_USER", iniGet(ini, "db", "user", ""))
-	pass := getenv("DB_PASSWORD", iniGet(ini, "db", "password", ""))
-	name := getenv("DB_NAME", iniGet(ini, "db", "namadb", ""))
+	host := getenv("DB_HOST", "")
+	port := getenv("DB_PORT", "3306")
+	user := getenv("DB_USER", "")
+	pass := getenv("DB_PASSWORD", "")
+	name := getenv("DB_NAME", "simpus")
 	if host == "" || user == "" || name == "" {
 		return Config{}, fmt.Errorf("database config not found; set DB_DSN or DB_HOST/DB_USER/DB_NAME")
 	}
@@ -198,58 +190,6 @@ func loadDotEnv(path string) error {
 		}
 	}
 	return scanner.Err()
-}
-
-func readINI(path string) (map[string]map[string]string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-
-	data := map[string]map[string]string{}
-	section := ""
-	scanner := bufio.NewScanner(f)
-	first := true
-	for scanner.Scan() {
-		line := scanner.Text()
-		if first {
-			line = strings.TrimPrefix(line, "\ufeff")
-			first = false
-		}
-		line = strings.TrimSpace(line)
-		if line == "" || strings.HasPrefix(line, ";") || strings.HasPrefix(line, "#") {
-			continue
-		}
-		if strings.HasPrefix(line, "[") && strings.HasSuffix(line, "]") {
-			section = strings.ToLower(strings.TrimSpace(line[1 : len(line)-1]))
-			if data[section] == nil {
-				data[section] = map[string]string{}
-			}
-			continue
-		}
-		key, value, ok := strings.Cut(line, "=")
-		if !ok || section == "" {
-			continue
-		}
-		data[section][strings.ToLower(strings.TrimSpace(key))] = strings.TrimSpace(value)
-	}
-	return data, scanner.Err()
-}
-
-func iniGet(ini map[string]map[string]string, section, key, fallback string) string {
-	if ini == nil {
-		return fallback
-	}
-	values := ini[strings.ToLower(section)]
-	if values == nil {
-		return fallback
-	}
-	value := values[strings.ToLower(key)]
-	if value == "" {
-		return fallback
-	}
-	return value
 }
 
 func getenv(key, fallback string) string {

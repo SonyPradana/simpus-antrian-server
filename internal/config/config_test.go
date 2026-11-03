@@ -15,7 +15,6 @@ func TestLoadRegistrationConfigFile(t *testing.T) {
 	}
 	t.Setenv("PCARE_MODE", "warn")
 	t.Setenv("DB_DSN", "user:pass@tcp(localhost:3306)/simpus")
-	t.Setenv("KONEKSI_FILE", filepath.Join(t.TempDir(), "missing.jjk"))
 
 	path := filepath.Join(t.TempDir(), "config.json")
 	content := `{
@@ -65,7 +64,6 @@ func TestLoadAPMAPIKey(t *testing.T) {
 	t.Setenv("APM_API_KEY", "  secret-key  ")
 	t.Setenv("PCARE_MODE", "warn")
 	t.Setenv("DB_DSN", "user:pass@tcp(localhost:3306)/simpus")
-	t.Setenv("KONEKSI_FILE", filepath.Join(t.TempDir(), "missing.jjk"))
 	setRegistrationEnv(t)
 
 	path := filepath.Join(t.TempDir(), "config.json")
@@ -86,7 +84,6 @@ func TestLoadAPMAPIKey(t *testing.T) {
 func TestLoadRejectsInvalidJenisKunjungan(t *testing.T) {
 	t.Setenv("PCARE_MODE", "warn")
 	t.Setenv("DB_DSN", "user:pass@tcp(localhost:3306)/simpus")
-	t.Setenv("KONEKSI_FILE", filepath.Join(t.TempDir(), "missing.jjk"))
 	setRegistrationEnv(t)
 
 	path := filepath.Join(t.TempDir(), "config.json")
@@ -109,7 +106,6 @@ func TestLoadRequiresRegistrationIDs(t *testing.T) {
 	}
 	t.Setenv("PCARE_MODE", "warn")
 	t.Setenv("DB_DSN", "user:pass@tcp(localhost:3306)/simpus")
-	t.Setenv("KONEKSI_FILE", filepath.Join(t.TempDir(), "missing.jjk"))
 
 	path := filepath.Join(t.TempDir(), "config.json")
 	if err := os.WriteFile(path, []byte(`{}`), 0o644); err != nil {
